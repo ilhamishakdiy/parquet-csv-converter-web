@@ -33,7 +33,17 @@ Copy `config.example.json` to `config.json` next to `app.py`.
 | `allow_network_paths` | `false` | UNC paths and mapped network drives are rejected unless this is `true`. |
 | `memory_limit`, `threads` | `6GB`, `4` | DuckDB tuning for a 16 GB PC. |
 
-**Local fallback:** if the hosted site or loopback access is blocked, run `bun run build:local` in `frontend\` and ship the resulting `web\` folder in the ZIP. Without a `frontend_url`, `Start.bat` then opens `http://127.0.0.1:8765/`, which FastAPI serves.
+**Local fallback:** the download ZIP always contains the compiled site in `web\`. Without a `frontend_url`, `Start.bat` opens `http://127.0.0.1:8765/convert/`, which FastAPI serves offline.
+
+## Website and download
+
+The site has three pages: `/` (what the converter is), `/convert/` (the converter) and `/start/` (setup guide with the download). `bun run build` in `frontend\` does three things:
+
+1. `next build` creates the static site in `out\`.
+2. It copies `out\` to `..\web` (offline copy).
+3. It writes `out\downloads\ParquetConverter.zip`, served by the site at `/downloads/ParquetConverter.zip`. The ZIP contains `Start.bat`, `app.py`, `backend\`, the pinned requirements, `config.example.json`, `README.txt` and `web\`.
+
+Set `PQCSV_FRONTEND_URL=https://<project>.pages.dev/` during the build (e.g. as a Cloudflare Pages environment variable) to include a `config.json` that makes `Start.bat` open the hosted site. For Cloudflare Pages: root directory `frontend`, build command `bun run build`, output directory `out`.
 
 ## Development
 
@@ -41,7 +51,7 @@ Copy `config.example.json` to `config.json` next to `app.py`.
 PS> python -m venv .venv
 PS> .\.venv\Scripts\python.exe -m pip install -r requirements-dev.txt
 PS> .\.venv\Scripts\python.exe -m pytest
-PS> .\.venv\Scripts\python.exe app.py --dev          # API + opens http://localhost:3000
+PS> .\.venv\Scripts\python.exe app.py --dev          # API + opens http://localhost:3000/convert/
 PS> cd frontend; bun install; bun run dev
 ```
 

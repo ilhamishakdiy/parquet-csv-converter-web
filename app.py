@@ -19,6 +19,7 @@ import time
 import urllib.error
 import urllib.request
 import webbrowser
+from urllib.parse import urljoin
 
 from backend.settings import APP_NAME, DEV_FRONTEND_URL, HOST, PORT, load_config
 
@@ -39,8 +40,10 @@ def _port_in_use() -> bool:
 
 
 def _open(frontend_url: str, token: str) -> None:
-    url = f"{frontend_url.split('#')[0]}#token={token}"
-    print(f"Opening {frontend_url}")
+    # Land directly on the converter page; the token is saved by the site on any page.
+    page = urljoin(frontend_url.split("#")[0], "convert/")
+    url = f"{page}#token={token}"
+    print(f"Opening {page}")
     webbrowser.open(url)
 
 

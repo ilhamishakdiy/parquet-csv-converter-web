@@ -1,316 +1,164 @@
-"use client";
+import Link from "next/link";
+import {
+  ArrowRight,
+  BookOpen,
+  FileSpreadsheet,
+  Filter,
+  Layers,
+  ListChecks,
+  Lock,
+  ShieldCheck,
+  SplitSquareVertical,
+} from "lucide-react";
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { Lock } from "lucide-react";
-import { ConfigStep, defaultConfig, parseRowLimit, type ConfigState } from "@/components/converter/config-step";
-import { ConnectionBadge, SetupGuide } from "@/components/converter/connection-panel";
-import { ConvertStep } from "@/components/converter/convert-step";
-import { JobProgress, JobResults } from "@/components/converter/job-panel";
-import { PreviewStep } from "@/components/converter/preview-step";
-import { SourceStep } from "@/components/converter/source-step";
-import { useConnection } from "@/hooks/use-connection";
-import { ApiError, api } from "@/lib/api";
-import { estimateRemaining, type Eta, type ProgressSample } from "@/lib/eta";
-import type { CollisionPolicy, JobResult, JobStatus, Plan, PreviewRequest, SourceInfo } from "@/lib/types";
+const FEATURES = [
+  {
+    icon: Lock,
+    title: "Stays on your PC",
+    body: "Files are read and written by a small converter running on your own computer. Nothing is uploaded. This website is only the screen you use to control it.",
+  },
+  {
+    icon: SplitSquareVertical,
+    title: "Excel-sized parts",
+    body: "Split millions of rows into CSV files of up to 800,000 rows each, or any limit you choose. Excel opens at most 1,048,575 rows per sheet.",
+  },
+  {
+    icon: Layers,
+    title: "Groups stay together",
+    body: "Pick columns such as store_code and every store's rows land in the same file. A group is never split across two parts.",
+  },
+  {
+    icon: Filter,
+    title: "Separate files per value",
+    body: "Choose a filter column such as department_code to get separate files per value, e.g. …_HARDWARE_part01.csv.",
+  },
+  {
+    icon: ListChecks,
+    title: "catalog.csv lookup",
+    body: "Every export includes catalog.csv, listing which file holds each department and store, so you can find the right file in seconds.",
+  },
+  {
+    icon: ShieldCheck,
+    title: "Checked before you see it",
+    body: "Every file's row count is verified against the source before it appears. Existing files are never overwritten.",
+  },
+];
 
-const POLL_MS = 750;
+const STEPS = [
+  { title: "Choose the source", body: "Browse to a .parquet file, or a folder of shards such as a BigQuery export." },
+  { title: "Configure", body: "Set the filename prefix, row limit, filter column and grouping columns." },
+  { title: "Preview", body: "See the exact file names and row counts before anything is written." },
+  { title: "Convert", body: "Watch the progress, then open the folder or catalog.csv when it's done." },
+];
 
-function stem(fileName: string): string {
-  return fileName.replace(/\.parquet$/i, "").replace(/[<>:"/\\|?*]/g, "_");
-}
+const EXAMPLE = [
+  "Malaysia_Sales_Nov2026_HARDWARE_part01.csv",
+  "Malaysia_Sales_Nov2026_HARDWARE_part02.csv",
+  "Malaysia_Sales_Nov2026_ELECTRICAL_part01.csv",
+  "catalog.csv",
+];
 
-function buildRequest(source: SourceInfo, c: ConfigState): PreviewRequest | null {
-  const rowLimit = c.mode === "single" ? 0 : parseRowLimit(c.rowLimitText);
-  if (rowLimit === null) return null;
-  return {
-    fingerprint: source.fingerprint,
-    mode: c.mode,
-    filter_column: c.filterColumn,
-    group_columns: c.mode === "group" ? c.groupColumns : [],
-    row_limit: c.mode === "single" ? 800_000 : rowLimit,
-    oversize_policy: c.mode === "group" ? c.oversizePolicy : "strict",
-    output_prefix: c.prefix.trim(),
-  };
-}
-
-export default function Home() {
-  const conn = useConnection();
-  const ready = conn.status === "ready";
-
-  const [sourcePath, setSourcePath] = useState("");
-  const [inspectedPath, setInspectedPath] = useState<string | null>(null);
-  const [source, setSource] = useState<SourceInfo | null>(null);
-  const [inspecting, setInspecting] = useState(false);
-  const [inspectError, setInspectError] = useState<string | null>(null);
-
-  const [config, setConfig] = useState<ConfigState>(defaultConfig);
-
-  const [plan, setPlan] = useState<Plan | null>(null);
-  const [planKey, setPlanKey] = useState<string | null>(null);
-  const [previewing, setPreviewing] = useState(false);
-  const [previewError, setPreviewError] = useState<string | null>(null);
-
-  const [destination, setDestination] = useState("");
-  const [collision, setCollision] = useState<CollisionPolicy>("fail");
-  const [ack, setAck] = useState(false);
-  const [starting, setStarting] = useState(false);
-  const [convertError, setConvertError] = useState<string | null>(null);
-
-  const [jobId, setJobId] = useState<string | null>(null);
-  const [jobStatus, setJobStatus] = useState<JobStatus | null>(null);
-  const [result, setResult] = useState<JobResult | null>(null);
-  const [cancelling, setCancelling] = useState(false);
-  const [eta, setEta] = useState<Eta | null>(null);
-
-  const handleError = useCallback(
-    (err: unknown, set: (m: string) => void) => {
-      if (err instanceof ApiError) {
-        if (err.code === "invalid_token" || err.code === "backend_unreachable") conn.refresh();
-        set(err.message);
-      } else set(String(err));
-    },
-    [conn],
-  );
-
-  const sourceStale = source !== null && sourcePath.trim() !== inspectedPath;
-  const request = useMemo(() => (source ? buildRequest(source, config) : null), [source, config]);
-  const configKey = request ? JSON.stringify(request) : null;
-  const planStale = plan !== null && (planKey !== configKey || sourceStale);
-
-  const invalidReason = !source
-    ? "Inspect a source file first."
-    : sourceStale
-      ? "Inspect the changed source path first."
-      : !config.prefix.trim()
-        ? "Enter a filename prefix."
-        : request === null
-          ? "Enter a valid row limit."
-          : config.mode === "group" && config.groupColumns.length === 0
-            ? "Add at least one grouping column."
-            : null;
-
-  const needsAck = !!plan && !planStale && plan.requires_acknowledgement;
-  const blockedReason = !plan
-    ? "Preview the files first."
-    : planStale
-      ? "Refresh the preview first."
-      : !plan.can_convert
-        ? "Fix the blocking problem shown in the preview."
-        : !destination.trim()
-          ? "Enter a destination folder."
-          : needsAck && !ack
-            ? "Confirm the oversized files above."
-            : null;
-
-  const jobActive = jobId !== null;
-  const jobRunning = jobStatus?.state === "running" || (jobActive && !jobStatus);
-
-  // Reattach to a conversion that is already running (e.g. after a page reload).
-  useEffect(() => {
-    const running = conn.health?.running_job_id;
-    // eslint-disable-next-line react-hooks/set-state-in-effect -- sync with server-side job state
-    if (running && !jobId) setJobId(running);
-  }, [conn.health?.running_job_id, jobId]);
-
-  // Poll the job until it reaches a terminal state.
-  useEffect(() => {
-    if (!jobId) return;
-    let stop = false;
-    let timer: ReturnType<typeof setTimeout>;
-    const samples: ProgressSample[] = [];
-    const tick = async () => {
-      try {
-        const st = await api.jobStatus(jobId);
-        if (stop) return;
-        setJobStatus(st);
-        samples.push({ t: st.elapsed_seconds, p: st.progress });
-        const remaining = st.state === "running" ? estimateRemaining(samples) : null;
-        setEta(remaining === null ? null : { seconds: remaining, finishAt: Date.now() + remaining * 1000 });
-        if (st.state === "succeeded") {
-          setResult(await api.jobResult(jobId));
-          return;
-        }
-        if (st.state !== "running") return;
-      } catch (err) {
-        if (err instanceof ApiError && err.status === 404) {
-          setJobId(null);
-          return;
-        }
-      }
-      if (!stop) timer = setTimeout(tick, POLL_MS);
-    };
-    void tick();
-    return () => {
-      stop = true;
-      clearTimeout(timer);
-    };
-  }, [jobId]);
-
-  const inspect = async (picked?: string) => {
-    const path = (picked ?? sourcePath).trim();
-    if (picked !== undefined) setSourcePath(picked);
-    setInspecting(true);
-    setInspectError(null);
-    try {
-      const info = await api.inspect(path);
-      if (!source || source.fingerprint !== info.fingerprint) {
-        // FR-03: a new or changed source clears column selections and the preview.
-        setConfig((c) => ({ ...c, filterColumn: null, groupColumns: [], prefix: c.prefix || stem(info.file_name) }));
-        setPlan(null);
-        setPlanKey(null);
-      }
-      setSource(info);
-      setInspectedPath(path);
-    } catch (err) {
-      setSource(null);
-      setPlan(null);
-      handleError(err, setInspectError);
-    } finally {
-      setInspecting(false);
-    }
-  };
-
-  const preview = async () => {
-    if (!request) return;
-    setPreviewing(true);
-    setPreviewError(null);
-    try {
-      const p = await api.preview(request);
-      setPlan(p);
-      setPlanKey(JSON.stringify(request));
-      setAck(false);
-    } catch (err) {
-      setPlan(null);
-      handleError(err, setPreviewError);
-    } finally {
-      setPreviewing(false);
-    }
-  };
-
-  const convert = async () => {
-    if (!plan || blockedReason) return;
-    setStarting(true);
-    setConvertError(null);
-    try {
-      const job = await api.createJob({
-        preview_id: plan.preview_id,
-        destination_dir: destination.trim(),
-        collision_policy: collision,
-        acknowledge_oversize: ack,
-      });
-      setJobStatus(null);
-      setResult(null);
-      setEta(null);
-      setJobId(job.job_id);
-      // The progress card is at the top of the page.
-      window.scrollTo({ top: 0, behavior: "smooth" });
-    } catch (err) {
-      handleError(err, setConvertError);
-      requestAnimationFrame(() =>
-        document.getElementById("convert-error")?.scrollIntoView({ behavior: "smooth", block: "center" }),
-      );
-    } finally {
-      setStarting(false);
-    }
-  };
-
-  const cancel = async () => {
-    if (!jobId) return;
-    setCancelling(true);
-    try {
-      setJobStatus(await api.cancelJob(jobId));
-    } catch (err) {
-      handleError(err, setConvertError);
-    } finally {
-      setCancelling(false);
-    }
-  };
-
-  const resetJob = () => {
-    setJobId(null);
-    setJobStatus(null);
-    setResult(null);
-    if (result) {
-      // Outputs now exist in the destination; require a fresh preview for the next run.
-      setPlan(null);
-      setPlanKey(null);
-    }
-  };
-
-  const locked = !ready || jobActive;
-
+export default function HomePage() {
   return (
-    <div className="min-h-full bg-muted/30">
-      <header className="border-b bg-background">
-        <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-4">
-          <div>
-            <h1 className="text-lg font-semibold tracking-tight">Parquet to CSV Converter</h1>
-            <p className="flex items-center gap-1 text-xs text-muted-foreground">
-              <Lock className="size-3" /> All processing happens on this PC. Nothing is uploaded.
+    <div className="flex-1">
+      <section className="border-b bg-muted/30">
+        <div className="mx-auto grid max-w-5xl gap-10 px-4 py-14 md:grid-cols-[1.2fr_1fr] md:items-center">
+          <div className="space-y-5">
+            <p className="inline-flex items-center gap-1.5 rounded-full border bg-background px-3 py-1 text-xs text-muted-foreground">
+              <Lock className="size-3" /> Your data never leaves your computer
             </p>
+            <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">
+              Turn huge Parquet exports into Excel-friendly CSV files
+            </h1>
+            <p className="text-muted-foreground">
+              Parquet files from BigQuery or data pipelines are often millions of rows: too big to open, and in a
+              format Excel can&apos;t read. This converter splits them into CSV files you can actually use, keeping
+              related rows together. No coding needed.
+            </p>
+            <div className="flex flex-wrap gap-2">
+              <Button asChild size="lg">
+                <Link href="/convert/">
+                  Open the converter <ArrowRight />
+                </Link>
+              </Button>
+              <Button asChild size="lg" variant="outline">
+                <Link href="/start/">
+                  <BookOpen /> How to start
+                </Link>
+              </Button>
+            </div>
           </div>
-          <ConnectionBadge conn={conn} />
+          <Card className="shadow-sm">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                <FileSpreadsheet className="size-4" /> Example output
+              </CardTitle>
+              <CardDescription>sales_nov2026.parquet, 1.45 million rows, filtered by department</CardDescription>
+            </CardHeader>
+            <CardContent>
+              <ul className="space-y-1.5 font-mono text-xs">
+                {EXAMPLE.map((name) => (
+                  <li
+                    key={name}
+                    className={
+                      name === "catalog.csv"
+                        ? "rounded-md border border-dashed px-2 py-1.5 text-muted-foreground"
+                        : "rounded-md border bg-muted/40 px-2 py-1.5"
+                    }
+                  >
+                    {name}
+                  </li>
+                ))}
+              </ul>
+            </CardContent>
+          </Card>
         </div>
-      </header>
+      </section>
 
-      <main className="mx-auto max-w-5xl space-y-4 px-4 py-6">
-        <SetupGuide conn={conn} />
+      <section className="mx-auto max-w-5xl px-4 py-12">
+        <h2 className="text-xl font-semibold tracking-tight">What it does</h2>
+        <div className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          {FEATURES.map(({ icon: Icon, title, body }) => (
+            <div key={title} className="space-y-2 rounded-xl border bg-card p-5">
+              <Icon className="size-5 text-primary" />
+              <h3 className="font-medium">{title}</h3>
+              <p className="text-sm text-muted-foreground">{body}</p>
+            </div>
+          ))}
+        </div>
+      </section>
 
-        {jobActive && jobStatus?.state === "succeeded" && result ? (
-          <JobResults result={result} filterColumn={plan?.filter_column ?? null} onReset={resetJob} />
-        ) : jobActive && !jobStatus ? (
-          <JobProgress
-            status={{ job_id: jobId ?? "", state: "running", stage: "starting", progress: 0, parts_completed: 0, parts_total: null, elapsed_seconds: 0, error: null }}
-            eta={null}
-            onCancel={cancel}
-            cancelling={cancelling}
-            onReset={resetJob}
-          />
-        ) : jobActive && jobStatus ? (
-          <JobProgress status={jobStatus} eta={eta} onCancel={cancel} cancelling={cancelling} onReset={resetJob} />
-        ) : null}
-
-        <SourceStep
-          disabled={locked}
-          path={sourcePath}
-          onPathChange={setSourcePath}
-          onInspect={() => inspect()}
-          onBrowsed={(p) => inspect(p)}
-          onBrowseError={setInspectError}
-          inspecting={inspecting}
-          error={inspectError}
-          source={source}
-          stale={sourceStale}
-          approvedRoots={conn.health?.approved_roots}
-        />
-        <ConfigStep disabled={locked || !source || sourceStale} columns={source?.columns ?? []} config={config} onChange={setConfig} />
-        <PreviewStep
-          disabled={locked || !source}
-          canPreview={!invalidReason}
-          invalidReason={invalidReason}
-          onPreview={preview}
-          previewing={previewing}
-          error={previewError}
-          plan={plan}
-          stale={planStale}
-        />
-        <ConvertStep
-          disabled={locked || !plan}
-          destination={destination}
-          onDestinationChange={setDestination}
-          onBrowseError={setConvertError}
-          collision={collision}
-          onCollisionChange={setCollision}
-          needsAck={needsAck}
-          ack={ack}
-          onAckChange={setAck}
-          canConvert={!blockedReason && !jobRunning}
-          blockedReason={blockedReason}
-          starting={starting}
-          onConvert={convert}
-          error={convertError}
-        />
-      </main>
+      <section className="border-t bg-muted/30">
+        <div className="mx-auto max-w-5xl px-4 py-12">
+          <h2 className="text-xl font-semibold tracking-tight">How it works</h2>
+          <ol className="mt-6 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+            {STEPS.map((step, i) => (
+              <li key={step.title} className="space-y-2 rounded-xl border bg-background p-5">
+                <span className="flex size-7 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
+                  {i + 1}
+                </span>
+                <h3 className="font-medium">{step.title}</h3>
+                <p className="text-sm text-muted-foreground">{step.body}</p>
+              </li>
+            ))}
+          </ol>
+          <div className="mt-8 flex flex-col items-start gap-3 rounded-xl border bg-background p-5 sm:flex-row sm:items-center sm:justify-between">
+            <div>
+              <p className="font-medium">First time here?</p>
+              <p className="text-sm text-muted-foreground">
+                Download the converter, double-click Start.bat, and you&apos;re ready in a few minutes.
+              </p>
+            </div>
+            <Button asChild>
+              <Link href="/start/">
+                Set it up <ArrowRight />
+              </Link>
+            </Button>
+          </div>
+        </div>
+      </section>
     </div>
   );
 }

@@ -4,8 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "build": "next build",
-    "build:local": "next build && bun scripts/copy-web.ts",
+    "build": "next build && bun scripts/copy-web.ts && bun scripts/build-zip.ts",
     "start": "next start",
     "lint": "eslint"
   },

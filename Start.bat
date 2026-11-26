@@ -3,6 +3,21 @@ setlocal EnableExtensions
 cd /d "%~dp0"
 title Parquet to CSV Converter
 
+rem --- 0. Must run from the extracted folder, not from inside the ZIP ---------
+if not exist "app.py" (
+    echo ERROR: Start.bat cannot find the rest of the converter.
+    echo It looks like it was opened from inside the ZIP file. Right-click the ZIP,
+    echo choose "Extract All...", extract to e.g. %USERPROFILE%\ParquetConverter,
+    echo then double-click Start.bat in the extracted folder.
+    pause
+    exit /b 1
+)
+echo "%CD%" | findstr /i "OneDrive" >nul && (
+    echo NOTE: This folder is synced by OneDrive. The converter works, but OneDrive will
+    echo upload its Python files. A folder such as %USERPROFILE%\ParquetConverter is better.
+    echo.
+)
+
 rem --- 1. Find Python 3.10+ -------------------------------------------------
 set "PY="
 py -3 -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)" >nul 2>&1 && set "PY=py -3"
@@ -23,7 +38,7 @@ if not exist ".venv\Scripts\python.exe" (
     %PY% -m venv .venv
     if errorlevel 1 (
         echo ERROR: Could not create the Python environment in "%CD%\.venv".
-        echo Make sure this folder is not read-only, e.g. extract the ZIP into Documents.
+        echo Make sure this folder is writable, e.g. extract the ZIP to %USERPROFILE%\ParquetConverter.
         pause
         exit /b 1
     )

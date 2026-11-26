@@ -6,3 +6,5 @@ __pycache__/
 web/
 # Per-deployment settings; see config.example.json
 config.json
+# Local assistant notes
+CLAUDE.md

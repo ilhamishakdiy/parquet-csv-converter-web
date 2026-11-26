@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import Link from "next/link";
 import { CheckCircle2, Loader2, PlugZap, ShieldAlert } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -86,9 +87,14 @@ export function SetupGuide({ conn }: { conn: ConnectionState }) {
             </Button>
           </div>
         </details>
-        <Button variant="outline" onClick={conn.refresh}>
-          Check again
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={conn.refresh}>
+            Check again
+          </Button>
+          <Button asChild variant="link">
+            <Link href="/start/">First time? Read How to start and download the converter</Link>
+          </Button>
+        </div>
       </CardContent>
     </Card>
   );
