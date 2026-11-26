@@ -1,7 +1,7 @@
 """Output filename rules (PRD 08, FR-11).
 
 Template: <prefix>_<filter_value>_partXX.csv. Filter values become Windows-safe
-tokens; the raw values are kept in catalog.csv.
+tokens; the raw values are kept in _catalog.csv.
 """
 
 from __future__ import annotations
@@ -12,7 +12,7 @@ import unicodedata
 
 from .errors import AppError
 
-CATALOG_NAME = "catalog.csv"
+CATALOG_NAME = "_catalog.csv"
 NULL_TOKEN = "__NULL__"
 EMPTY_TOKEN = "__EMPTY__"
 MAX_PREFIX = 100
@@ -45,8 +45,9 @@ def validate_prefix(prefix: str | None) -> str:
         raise AppError("invalid_prefix", "The prefix cannot end with a dot.")
     if is_reserved_name(value):
         raise AppError("invalid_prefix", f"'{value}' is a reserved Windows device name.")
-    if value.casefold() == "catalog":
-        raise AppError("invalid_prefix", "'catalog' is reserved for catalog.csv. Choose another prefix.")
+    if not value[0].isalnum():
+        # Keeps _catalog.csv sorted above every data file in Windows Explorer.
+        raise AppError("invalid_prefix", "The prefix must start with a letter or a digit.")
     return value
 
 

@@ -50,7 +50,7 @@ function add(rel: string, data?: Buffer) {
   entries.push({ name: TOP + rel.split(sep).join("/"), data: bytes, mtime: data ? new Date() : statSync(full).mtime });
 }
 
-for (const f of ["Start.bat", "app.py", "requirements.txt", "config.example.json"]) add(f);
+for (const f of ["Start.bat", "app.py", "converter.ico", "requirements.txt", "config.example.json"]) add(f);
 for (const f of walk(join(ROOT, "backend")).filter((p) => p.endsWith(".py"))) add(relative(ROOT, f));
 const web = join(ROOT, "web");
 if (existsSync(web)) {

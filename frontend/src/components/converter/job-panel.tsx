@@ -20,7 +20,7 @@ const STAGES: Record<string, string> = {
   checking_source: "Checking the source file",
   exporting: "Writing CSV parts",
   validating: "Verifying row counts",
-  writing_catalog: "Writing catalog.csv",
+  writing_catalog: "Writing _catalog.csv",
   publishing: "Publishing files",
 };
 
@@ -124,7 +124,7 @@ export function JobResults({ result, filterColumn, onReset }: { result: JobResul
           <CheckCircle2 className="size-5 text-emerald-600" /> Conversion complete
         </CardTitle>
         <CardDescription>
-          {formatNumber(result.file_count)} CSV file(s) and catalog.csv were verified and published in{" "}
+          {formatNumber(result.file_count)} CSV file(s) and _catalog.csv were verified and published in{" "}
           {formatDuration(result.duration_seconds)}.
         </CardDescription>
       </CardHeader>
@@ -226,7 +226,7 @@ function OpenButtons({ jobId }: { jobId: string }) {
           {busy === "folder" ? <Loader2 className="animate-spin" /> : <FolderOpen />} Open destination folder
         </Button>
         <Button variant="outline" onClick={() => open("catalog")} disabled={busy !== null}>
-          {busy === "catalog" ? <Loader2 className="animate-spin" /> : <FileSpreadsheet />} Open catalog.csv
+          {busy === "catalog" ? <Loader2 className="animate-spin" /> : <FileSpreadsheet />} Open _catalog.csv
         </Button>
       </div>
       <ErrorAlert message={error} />

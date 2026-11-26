@@ -21,7 +21,7 @@ import urllib.request
 import webbrowser
 from urllib.parse import urljoin
 
-from backend.settings import APP_NAME, DEV_FRONTEND_URL, HOST, PORT, load_config
+from backend.settings import APP_DIR, APP_NAME, DEV_FRONTEND_URL, HOST, PORT, load_config
 
 
 def _health() -> dict | None:
@@ -51,12 +51,20 @@ def main() -> int:
     parser = argparse.ArgumentParser(description="Parquet to CSV Converter launcher")
     parser.add_argument("--dev", action="store_true", help=f"use the Next.js dev server at {DEV_FRONTEND_URL}")
     parser.add_argument("--no-browser", action="store_true", help="do not open the browser")
+    parser.add_argument("--no-shortcut", action="store_true", help="do not create a desktop shortcut")
     args = parser.parse_args()
 
     cfg = load_config()
     if args.dev:
         cfg.frontend_url = DEV_FRONTEND_URL
     cfg.data_dir.mkdir(parents=True, exist_ok=True)
+
+    if not (args.dev or args.no_shortcut):
+        from backend.shortcut import ensure_desktop_shortcut
+
+        message = ensure_desktop_shortcut(APP_DIR, cfg.data_dir / "desktop-shortcut.json")
+        if message:
+            print(message)
 
     health = _health()
     if health and health.get("app") == APP_NAME:

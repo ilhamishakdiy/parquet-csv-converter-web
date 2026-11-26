@@ -64,7 +64,7 @@ def test_open_only_paths_of_a_succeeded_job(env, monkeypatch):
 
     assert env.client.post("/open", json={"job_id": job_id, "target": "folder"}).status_code == 200
     assert env.client.post("/open", json={"job_id": job_id, "target": "catalog"}).status_code == 200
-    assert [str(p) for p in opened] == [str(out), str(out / "catalog.csv")]
+    assert [str(p) for p in opened] == [str(out), str(out / "_catalog.csv")]
 
     assert env.client.post("/open", json={"job_id": "nope", "target": "folder"}).status_code == 404
     assert env.client.post("/open", json={"job_id": job_id, "target": "C:\\Windows"}).status_code == 422

@@ -36,8 +36,8 @@ const FEATURES = [
   },
   {
     icon: ListChecks,
-    title: "catalog.csv lookup",
-    body: "Every export includes catalog.csv, listing which file holds each department and store, so you can find the right file in seconds.",
+    title: "_catalog.csv lookup",
+    body: "Every export includes _catalog.csv, listing which file holds each department and store, so you can find the right file in seconds.",
   },
   {
     icon: ShieldCheck,
@@ -50,14 +50,14 @@ const STEPS = [
   { title: "Choose the source", body: "Browse to a .parquet file, or a folder of shards such as a BigQuery export." },
   { title: "Configure", body: "Set the filename prefix, row limit, filter column and grouping columns." },
   { title: "Preview", body: "See the exact file names and row counts before anything is written." },
-  { title: "Convert", body: "Watch the progress, then open the folder or catalog.csv when it's done." },
+  { title: "Convert", body: "Watch the progress, then open the folder or _catalog.csv when it's done." },
 ];
 
 const EXAMPLE = [
+  "_catalog.csv",
   "Malaysia_Sales_Nov2026_HARDWARE_part01.csv",
   "Malaysia_Sales_Nov2026_HARDWARE_part02.csv",
   "Malaysia_Sales_Nov2026_ELECTRICAL_part01.csv",
-  "catalog.csv",
 ];
 
 export default function HomePage() {
@@ -103,7 +103,7 @@ export default function HomePage() {
                   <li
                     key={name}
                     className={
-                      name === "catalog.csv"
+                      name === "_catalog.csv"
                         ? "rounded-md border border-dashed px-2 py-1.5 text-muted-foreground"
                         : "rounded-md border bg-muted/40 px-2 py-1.5"
                     }

@@ -4,7 +4,9 @@ from backend import naming
 from backend.errors import AppError
 
 
-@pytest.mark.parametrize("prefix", ["", "  ", "a/b", "x:y", 'q"', "CON", "con.txt", "LPT1", "catalog", "Catalog", "ends."])
+@pytest.mark.parametrize(
+    "prefix", ["", "  ", "a/b", "x:y", 'q"', "CON", "con.txt", "LPT1", "ends.", "_catalog", "_x", "-x", "(x)", "!x", "~x"]
+)
 def test_invalid_prefixes_rejected(prefix):
     with pytest.raises(AppError):
         naming.validate_prefix(prefix)
@@ -13,6 +15,21 @@ def test_invalid_prefixes_rejected(prefix):
 def test_valid_prefix_kept():
     assert naming.validate_prefix(" Malaysia_Sales_Nov2026 ") == "Malaysia_Sales_Nov2026"
     assert naming.validate_prefix("Jualan_Mélange_数据") == "Jualan_Mélange_数据"
+    assert naming.validate_prefix("2026_sales") == "2026_sales"
+    assert naming.validate_prefix("catalog") == "catalog"  # no longer collides with _catalog.csv
+
+
+def test_catalog_sorts_first_in_windows_explorer():
+    """Explorer orders names with StrCmpLogicalW; _catalog.csv must come before every possible data file."""
+    import ctypes
+    import sys
+
+    if sys.platform != "win32":
+        pytest.skip("Windows-only sort order")
+    cmp = ctypes.windll.shlwapi.StrCmpLogicalW
+    names = ["0_part01.csv", "2026_sales_part01.csv", "A_part01.csv", "Malaysia_Sales_HARDWARE_part01.csv", "数据_part01.csv", "Ölpreise.csv"]
+    for name in names:
+        assert cmp(naming.CATALOG_NAME, name) < 0, name
 
 
 def test_tokens_null_empty_unicode_invalid():
