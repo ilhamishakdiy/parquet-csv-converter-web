@@ -20,17 +20,33 @@ echo "%CD%" | findstr /i "OneDrive" >nul && (
 
 rem --- 1. Find Python 3.10+ -------------------------------------------------
 set "PY="
-py -3 -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)" >nul 2>&1 && set "PY=py -3"
+set "PYCHECK=import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)"
+rem Python Install Manager (python-manager-*.msix): the first "py" call may download Python
+rem and ask questions, so run it visibly instead of hiding its output.
+where pymanager >nul 2>&1 || goto classic_python
+echo Checking Python. The first time, the Python Install Manager may download Python
+echo ^(a few minutes^) and ask a question - answer it in this window.
+py -3 -c "%PYCHECK%" && set "PY=py -3"
+if defined PY goto python_found
+echo Installing Python with the Python Install Manager...
+py install default
+py -3 -c "%PYCHECK%" && set "PY=py -3"
+if defined PY goto python_found
+
+:classic_python
+py -3 -c "%PYCHECK%" >nul 2>&1 && set "PY=py -3"
 if not defined PY (
-    python -c "import sys; sys.exit(0 if sys.version_info >= (3, 10) else 1)" >nul 2>&1 && set "PY=python"
+    python -c "%PYCHECK%" >nul 2>&1 && set "PY=python"
 )
 if not defined PY (
     echo ERROR: Python 3.10 or newer was not found.
-    echo Install Python from the company software portal or https://www.python.org/downloads/windows/
+    echo Download it from the official site https://www.python.org/downloads/
+    echo ^(or the company software portal^)
     echo and tick "Add python.exe to PATH" during setup. Then double-click Start.bat again.
     pause
     exit /b 1
 )
+:python_found
 
 rem --- 2. Create the virtual environment on first launch --------------------
 if not exist ".venv\Scripts\python.exe" (
@@ -45,22 +61,26 @@ if not exist ".venv\Scripts\python.exe" (
 )
 set "VPY=.venv\Scripts\python.exe"
 
-rem --- 3. Install pinned dependencies only when requirements.txt changed ---
-set "REQHASH="
-for /f "usebackq delims=" %%H in (`"%VPY%" -c "import hashlib;print(hashlib.sha256(open('requirements.txt','rb').read()).hexdigest())"`) do set "REQHASH=%%H"
-set "OLDHASH="
-if exist ".venv\requirements.sha256" set /p OLDHASH=<".venv\requirements.sha256"
-if not "%REQHASH%"=="%OLDHASH%" (
-    echo Installing dependencies...
-    "%VPY%" -m pip install --disable-pip-version-check --no-input -r requirements.txt
-    if errorlevel 1 (
-        echo ERROR: Installing dependencies failed. Check the network or proxy settings,
-        echo or ask IT whether the Python package repository ^(PyPI^) is blocked.
-        pause
-        exit /b 1
-    )
-    > ".venv\requirements.sha256" echo %REQHASH%
-)
+rem --- 3. Install pinned dependencies when requirements.txt changed or packages are missing ---
+"%VPY%" -m backend.envcheck check
+if not errorlevel 1 goto start
+echo Installing dependencies. The first time this takes a minute or two...
+"%VPY%" -m pip install --disable-pip-version-check --no-input -r requirements.txt
+if errorlevel 1 goto install_failed
+"%VPY%" -m backend.envcheck stamp
+"%VPY%" -m backend.envcheck check
+if errorlevel 1 goto install_failed
+goto start
+
+:install_failed
+echo.
+echo ERROR: Installing dependencies failed. See the messages above.
+echo Check the network or proxy settings, or ask IT whether the Python package
+echo repository ^(PyPI^) is blocked. Then double-click Start.bat again.
+pause
+exit /b 1
+
+:start
 
 rem --- 4. Start the converter and open the website ----------------------------
 "%VPY%" app.py %*
