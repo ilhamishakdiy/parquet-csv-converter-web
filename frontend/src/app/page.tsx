@@ -42,7 +42,7 @@ const FEATURES = [
   {
     icon: ShieldCheck,
     title: "Checked before you see it",
-    body: "Every file's row count is verified against the source before it appears. Existing files are never overwritten.",
+    body: "Every file's row count is verified against the source before it appears. Existing files are only replaced if you choose to.",
   },
 ];
 

@@ -214,7 +214,7 @@ def run_job(job_dir: Path) -> None:
         con = None
 
         status.stage("publishing")
-        published = _publish(plan, staging, destination)
+        published = _publish(plan, staging, destination, overwrite=bool(spec.get("overwrite")))
         remove_tree(staging)
 
         files = [
@@ -364,26 +364,59 @@ def _write_catalog(con: duckdb.DuckDBPyConnection, plan: Plan, actual_rows: dict
     return int(rows)
 
 
-def _publish(plan: Plan, staging: Path, destination: Path) -> list[str]:
-    """Move validated parts, then the catalogue, into place. Never overwrites; rolls back on failure."""
+def _publish(plan: Plan, staging: Path, destination: Path, overwrite: bool = False) -> list[str]:
+    """Move validated parts, then the catalogue, into place; rolls back on failure.
+
+    Without ``overwrite`` an existing file stops the publish. With it, existing files of the
+    same names are first moved aside into the staging folder, so a failure (e.g. a file open
+    in Excel) restores them. Files with other names are never touched.
+    """
     names = [f.file_name for f in plan.files] + [naming.CATALOG_NAME]
     clashes = [n for n in names if (destination / n).exists()]
-    if clashes:
+    if clashes and not overwrite:
         raise AppError(
             "destination_collision",
             f"These files appeared in the destination during the conversion: {', '.join(clashes[:5])}. Nothing was published.",
             409,
         )
+    backup = staging / "_replaced"
+    set_aside: list[str] = []
     moved: list[str] = []
     try:
+        if clashes:
+            backup.mkdir(exist_ok=True)
+            for name in clashes:
+                try:
+                    os.rename(destination / name, backup / name)
+                except PermissionError as exc:
+                    raise AppError(
+                        "destination_locked",
+                        f"Cannot replace {name}: it is open in another program (e.g. Excel). Close it and convert again. Nothing was changed.",
+                        409,
+                    ) from exc
+                set_aside.append(name)
         for name in names:
             os.rename(staging / name, destination / name)  # raises if the target exists
             moved.append(name)
-    except OSError:
+    except (OSError, AppError):
         for name in reversed(moved):
             try:
                 os.rename(destination / name, staging / name)
             except OSError:
                 pass
+        unrestored = []
+        for name in reversed(set_aside):
+            try:
+                os.rename(backup / name, destination / name)
+            except OSError:
+                unrestored.append(name)
+        if unrestored:
+            # The staging folder is deleted on failure; keep the old files somewhere visible instead.
+            keep = destination / f"_replaced_files_{time.strftime('%Y%m%d_%H%M%S')}"
+            os.rename(backup, keep)
+            raise AppError(
+                "publish_failed",
+                f"Publishing failed and {len(unrestored)} original file(s) could not be put back. They are safe in {keep}.",
+            )
         raise
     return [str(destination / n) for n in moved]

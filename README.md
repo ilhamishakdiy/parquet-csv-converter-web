@@ -75,7 +75,7 @@ PS> cd frontend; bun install; bun run dev
 1. `/inspect` reads Parquet metadata only (schema, row count) and fingerprints every file's path, size and modified time.
 2. `/preview` runs one aggregate scan of the filter and grouping columns. It applies sequential next-fit per filter value (deterministic order, NULLs last) and stores the plan in a DuckDB file.
 3. `/jobs` starts `python -m backend.worker` (one at a time). The worker joins the source to the plan with NULL-safe equality and writes every part in a single `COPY … PARTITION_BY` into a hidden staging folder inside the destination.
-4. The worker reads every part back to count its records and checks each against the plan and the total against the source. It re-checks the source fingerprint, writes `_catalog.csv` and renames everything into place. It never overwrites, and it rolls back if a rename fails.
+4. The worker reads every part back to count its records and checks each against the plan and the total against the source. It re-checks the source fingerprint, writes `_catalog.csv` and renames everything into place. By default it never overwrites. With "Overwrite existing files" it moves same-named files aside first and puts them back if anything fails. Files with other names are never touched.
 5. Cancellation, failure or a crashed worker removes staging, and nothing is published.
 
 ## Security

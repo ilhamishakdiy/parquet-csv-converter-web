@@ -2,9 +2,14 @@
 
 import csv
 import io
+import sys
 import time
+import types
 
 import duckdb
+import pytest
+
+from backend.errors import AppError
 
 from .conftest import convert, inspect, make_parquet, preview, read_outputs
 
@@ -191,6 +196,47 @@ def test_collision_never_overwrites_and_new_folder(env):
     status, result = convert(env.client, plan["preview_id"], out, collision_policy="new_folder")
     assert status["state"] == "succeeded"
     assert result["destination"].startswith(str(out)) and result["destination"] != str(out)
+
+
+def test_overwrite_replaces_only_same_names(env):
+    src = make_parquet(env.root / "o.parquet", "SELECT i FROM range(5) r(i)")
+    info = inspect(env.client, src)
+    out = env.root / "out"
+    out.mkdir()
+    (out / "_catalog.csv").write_text("old catalog", encoding="utf-8")
+    (out / "Out.csv").write_text("old data", encoding="utf-8")
+    (out / "notes.txt").write_text("unrelated", encoding="utf-8")
+    plan = preview(env.client, info["fingerprint"], mode="single", output_prefix="Out")
+    status, result = convert(env.client, plan["preview_id"], out, collision_policy="overwrite")
+    assert status["state"] == "succeeded", status
+    assert result["destination"] == str(out)
+    assert (out / "Out.csv").read_text(encoding="utf-8").splitlines() == ["i", "0", "1", "2", "3", "4"]
+    assert (out / "_catalog.csv").read_text(encoding="utf-8").startswith("file_name,row_count")
+    assert (out / "notes.txt").read_text(encoding="utf-8") == "unrelated"
+    assert sorted(p.name for p in out.iterdir()) == ["Out.csv", "_catalog.csv", "notes.txt"]
+
+
+def test_overwrite_locked_file_restores_originals(env, tmp_path):
+    from backend import exporter
+
+    if sys.platform != "win32":
+        pytest.skip("Windows file locking")
+    dest = tmp_path / "dest"
+    staging = dest / ".pqcsv-staging-x"
+    staging.mkdir(parents=True)
+    (dest / "_catalog.csv").write_text("old catalog", encoding="utf-8")
+    (dest / "P.csv").write_text("old data", encoding="utf-8")
+    (staging / "_catalog.csv").write_text("new catalog", encoding="utf-8")
+    (staging / "P.csv").write_text("new data", encoding="utf-8")
+
+    plan = types.SimpleNamespace(files=[types.SimpleNamespace(file_name="P.csv")])
+    with open(dest / "_catalog.csv", "rb"):  # held open: Windows refuses the rename
+        with pytest.raises(AppError) as err:
+            exporter._publish(plan, staging, dest, overwrite=True)
+    assert err.value.code == "destination_locked"
+    assert (dest / "P.csv").read_text(encoding="utf-8") == "old data"
+    assert (dest / "_catalog.csv").read_text(encoding="utf-8") == "old catalog"
+    assert (staging / "P.csv").read_text(encoding="utf-8") == "new data"
 
 
 def test_schema_change_invalidates_preview(env):

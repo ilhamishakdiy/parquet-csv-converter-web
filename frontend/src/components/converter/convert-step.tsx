@@ -83,7 +83,17 @@ export function ConvertStep({
           <Label htmlFor="col-new" className="flex items-center gap-2 font-normal">
             <RadioGroupItem id="col-new" value="new_folder" /> Create a new dated subfolder for this export
           </Label>
+          <Label htmlFor="col-overwrite" className="flex items-center gap-2 font-normal">
+            <RadioGroupItem id="col-overwrite" value="overwrite" /> Overwrite existing files with the same names
+          </Label>
         </RadioGroup>
+        {collision === "overwrite" && (
+          <p className="text-xs text-muted-foreground">
+            Only files with the same names as the preview (and <span className="font-mono">_catalog.csv</span>) are
+            replaced, after every row count is verified. Other files in the folder, such as extra parts from an earlier
+            export, are left as they are. Close any of these files that are open in Excel first.
+          </p>
+        )}
       </div>
       {needsAck && (
         <Label htmlFor="ack" className="flex items-start gap-2 rounded-lg border border-amber-300 bg-amber-50 p-3 font-normal text-amber-900 dark:bg-amber-950/40 dark:text-amber-200">

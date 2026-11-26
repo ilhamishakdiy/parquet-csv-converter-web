@@ -19,8 +19,9 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
           <SiteHeader />
           <main className="flex flex-1 flex-col">{children}</main>
           <footer className="border-t bg-background">
-            <div className="mx-auto max-w-5xl px-4 py-4 text-xs text-muted-foreground">
-              Your data is processed only on your own PC. This website never receives your files.
+            <div className="mx-auto flex max-w-5xl flex-col gap-1 px-4 py-4 text-xs text-muted-foreground sm:flex-row sm:justify-between">
+              <span>Your data is processed only on your own PC. This website never receives your files.</span>
+              <span>Developed by ITSD</span>
             </div>
           </footer>
         </TooltipProvider>
