@@ -1,0 +1,98 @@
+name: Test, build and deploy
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+env:
+  PAGES_PROJECT: parquet-csv-converter
+  SITE_URL: https://parquet-csv-converter.pages.dev/
+
+jobs:
+  test:
+    name: Backend tests (Windows)
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v5
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.12"
+          cache: pip
+          cache-dependency-path: requirements*.txt
+      - run: python -m pip install --disable-pip-version-check -r requirements-dev.txt
+      - run: python -m pytest -q -p no:warnings
+
+  build:
+    name: Build site and ZIP
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v5
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.4.5
+      - run: bun install --frozen-lockfile
+      - name: Type check
+        run: bunx next typegen && bunx tsc --noEmit # typegen creates LayoutProps etc. in .next/types
+      - run: bun run lint
+      - name: Build (static export + ParquetConverter.zip)
+        run: bun run build
+        env:
+          PQCSV_FRONTEND_URL: ${{ env.SITE_URL }}
+      - uses: actions/upload-artifact@v4
+        with:
+          name: site
+          path: frontend/out
+          retention-days: 7
+
+  deploy:
+    name: Deploy to Cloudflare Pages
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: [test, build]
+    runs-on: ubuntu-latest
+    environment:
+      name: production
+      url: ${{ env.SITE_URL }}
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: site
+          path: site
+      - uses: actions/setup-node@v5
+        with:
+          node-version: 22
+      - name: Check Cloudflare credentials
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "$CLOUDFLARE_API_TOKEN" ] || [ -z "$CLOUDFLARE_ACCOUNT_ID" ]; then
+            echo "::error::Set the CLOUDFLARE_API_TOKEN secret and CLOUDFLARE_ACCOUNT_ID variable in the repository settings."
+            exit 1
+          fi
+      # Runs from a folder with only the built files, so Wrangler's Next.js auto-setup never triggers.
+      - name: Deploy
+        env:
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          WRANGLER_SEND_METRICS: "false"
+          COMMIT_MESSAGE: ${{ github.event.head_commit.message || 'manual deploy' }}
+        run: |
+          MSG="$(printf '%s' "$COMMIT_MESSAGE" | head -n1 | cut -c1-200)"
+          npx --yes wrangler@4.168.0 pages deploy site \
+            --project-name "$PAGES_PROJECT" \
+            --branch main \
+            --commit-hash "$GITHUB_SHA" \
+            --commit-message "$MSG" \
+            --commit-dirty=true
