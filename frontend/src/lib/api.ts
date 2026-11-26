@@ -87,7 +87,7 @@ export const api = {
   }) => request<{ job_id: string; destination: string; warnings: string[] }>("POST", "/jobs", body),
   jobStatus: (id: string) => request<JobStatus>("GET", `/jobs/${encodeURIComponent(id)}`),
   cancelJob: (id: string) => request<JobStatus>("POST", `/jobs/${encodeURIComponent(id)}/cancel`),
-  /** Opens a finished job's destination folder (Explorer) or catalog.csv (default app) on this PC. */
+  /** Opens a finished job's destination folder (Explorer) or _catalog.csv (default app) on this PC. */
   openOutput: (job_id: string, target: "folder" | "catalog") =>
     request<{ opened: string }>("POST", "/open", { job_id, target }),
   jobResult: (id: string) => request<JobResult>("GET", `/jobs/${encodeURIComponent(id)}/result`),

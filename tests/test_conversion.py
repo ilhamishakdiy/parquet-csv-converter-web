@@ -41,7 +41,7 @@ def test_prd_example_filter_and_group(env):
     assert result["total_rows"] == 1450 == result["source_rows"]
     assert result["validation"]["status"] == "passed"
 
-    with open(out / "catalog.csv", encoding="utf-8", newline="") as fh:
+    with open(out / "_catalog.csv", encoding="utf-8", newline="") as fh:
         rows = list(csv.reader(fh))
     assert rows[0] == ["file_name", "department_code", "store_code", "row_count"]
     assert rows[1:] == [
@@ -59,7 +59,7 @@ def test_prd_example_filter_and_group(env):
     assert con.execute(f"SELECT max(c) FROM (SELECT department_code, store_code, count(DISTINCT filename) c FROM {rel} GROUP BY ALL)").fetchone()[0] == 1
     # Conservation: no loss or duplicates.
     assert con.execute(f"SELECT count(*), count(DISTINCT department_code || '|' || store_code || '|' || id) FROM {rel}").fetchone() == (1450, 1450)
-    assert sorted(p.name for p in out.iterdir()) == sorted(list(files) + ["catalog.csv"])
+    assert sorted(p.name for p in out.iterdir()) == sorted(list(files) + ["_catalog.csv"])
 
 
 def test_null_keys_and_csv_correctness(env):
@@ -91,7 +91,7 @@ line2'),
     orig = con.execute(f"SELECT id, f, g, txt FROM read_parquet('{src}') ORDER BY 1").fetchall()
     assert back == orig
 
-    text = (out / "catalog.csv").read_text(encoding="utf-8")
+    text = (out / "_catalog.csv").read_text(encoding="utf-8")
     rows = list(csv.reader(io.StringIO(text)))
     assert rows[0] == ["file_name", "f", "g", "row_count"]
     # NULL is an empty unquoted field; empty string is written as "".
@@ -131,13 +131,13 @@ def test_rows_mode_no_filter_and_single_modes(env):
     assert [f["file_name"] for f in plan["files"]] == ["Out.csv"]
     status, result = convert(env.client, plan["preview_id"], env.root / "b")
     assert status["state"] == "succeeded" and result["total_rows"] == 25
-    assert (env.root / "b" / "catalog.csv").read_text(encoding="utf-8").splitlines() == ["file_name,row_count", "Out.csv,25"]
+    assert (env.root / "b" / "_catalog.csv").read_text(encoding="utf-8").splitlines() == ["file_name,row_count", "Out.csv,25"]
 
     plan = preview(env.client, info["fingerprint"], mode="single", filter_column="k")
     assert [f["file_name"] for f in plan["files"]] == ["Out_0_part01.csv", "Out_1_part01.csv", "Out_2_part01.csv"]
     status, _ = convert(env.client, plan["preview_id"], env.root / "c")
     assert status["state"] == "succeeded", status
-    assert (env.root / "c" / "catalog.csv").read_text(encoding="utf-8").splitlines()[0] == "file_name,k,row_count"
+    assert (env.root / "c" / "_catalog.csv").read_text(encoding="utf-8").splitlines()[0] == "file_name,k,row_count"
 
 
 def test_boundary_and_oversize_policies(env):
@@ -174,7 +174,7 @@ def test_empty_source_header_only(env):
     status, result = convert(env.client, plan["preview_id"], out)
     assert status["state"] == "succeeded", status
     assert (out / "Out_part01.csv").read_text(encoding="utf-8") == "a,b\n"
-    assert (out / "catalog.csv").read_text(encoding="utf-8").splitlines() == ["file_name,a,b,row_count", "Out_part01.csv,,,0"]
+    assert (out / "_catalog.csv").read_text(encoding="utf-8").splitlines() == ["file_name,a,b,row_count", "Out_part01.csv,,,0"]
 
 
 def test_collision_never_overwrites_and_new_folder(env):
@@ -182,11 +182,11 @@ def test_collision_never_overwrites_and_new_folder(env):
     info = inspect(env.client, src)
     out = env.root / "out"
     out.mkdir()
-    (out / "catalog.csv").write_text("keep me", encoding="utf-8")
+    (out / "_catalog.csv").write_text("keep me", encoding="utf-8")
     plan = preview(env.client, info["fingerprint"], mode="single")
     r = env.client.post("/jobs", json={"preview_id": plan["preview_id"], "destination_dir": str(out)})
     assert r.status_code == 409 and r.json()["detail"]["code"] == "destination_collision"
-    assert (out / "catalog.csv").read_text(encoding="utf-8") == "keep me"
+    assert (out / "_catalog.csv").read_text(encoding="utf-8") == "keep me"
 
     status, result = convert(env.client, plan["preview_id"], out, collision_policy="new_folder")
     assert status["state"] == "succeeded"

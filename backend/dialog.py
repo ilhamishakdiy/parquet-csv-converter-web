@@ -79,7 +79,7 @@ def _powershell_dialog(kind: str, initial: str | None) -> str | None:
 
 
 def open_in_shell(path: Path) -> None:
-    """Open a folder in Explorer, or a file in its default app (e.g. catalog.csv in Excel)."""
+    """Open a folder in Explorer, or a file in its default app (e.g. _catalog.csv in Excel)."""
     if not path.exists():
         raise AppError("not_found", f"It no longer exists: {path}", 404)
     if sys.platform != "win32":

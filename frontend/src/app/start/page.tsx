@@ -148,8 +148,9 @@ export default function StartPage() {
               </span>
             </Step>
             <Step n={3} title="Double-click Start.bat">
-              A black window opens. The first launch installs what the converter needs, which takes a minute or two.
-              If Windows SmartScreen appears, choose <strong>More info → Run anyway</strong> if your IT policy allows it.
+              A black window opens. The first launch installs what the converter needs, which takes a minute or two,
+              and adds a <strong>Parquet to CSV Converter</strong> shortcut to your desktop. If Windows SmartScreen
+              appears, choose <strong>More info → Run anyway</strong> if your IT policy allows it.
             </Step>
             <Step n={4} title="Allow local network access">
               The converter page opens in your browser. If the browser asks to access devices on your local network,
@@ -165,13 +166,16 @@ export default function StartPage() {
           <h2 className="text-xl font-semibold tracking-tight">Every time after that</h2>
           <ul className="mt-4 list-disc space-y-2 pl-5 text-sm">
             <li>
-              Double-click <strong>Start.bat</strong>. It starts in seconds and opens the converter page.
+              Double-click the <strong>Parquet to CSV Converter</strong> shortcut on your desktop (or Start.bat). It
+              starts in seconds and opens the converter page.
             </li>
             <li>
               Keep the black window open while you work. Closing it stops the converter.
             </li>
             <li>
-              Tip: right-click Start.bat → <strong>Send to → Desktop (create shortcut)</strong> for a desktop icon.
+              Deleted the shortcut? It won&apos;t come back by itself. Right-click Start.bat →{" "}
+              <strong>Send to → Desktop (create shortcut)</strong> to add it again. If you extract a new version to a
+              different folder, the shortcut is updated automatically.
             </li>
             <li>When a new version is released, download the new ZIP and extract it over the old folder.</li>
           </ul>

@@ -248,7 +248,7 @@ def run_job(job_dir: Path) -> None:
                     {"name": "source_unchanged", "passed": True, "detail": "Source fingerprint matched before and after export."},
                     {"name": "file_counts", "passed": True, "detail": f"All {len(files)} file(s) match their planned row counts."},
                     {"name": "conservation", "passed": True, "detail": f"Exported {sum(actual_rows.values()):,} rows = {info.row_count:,} source rows."},
-                    {"name": "catalog", "passed": True, "detail": f"catalog.csv lists every file ({catalog_rows} row(s))."},
+                    {"name": "catalog", "passed": True, "detail": f"_catalog.csv lists every file ({catalog_rows} row(s))."},
                 ],
             },
             "published": published,
@@ -359,7 +359,7 @@ def _write_catalog(con: duckdb.DuckDBPyConnection, plan: Plan, actual_rows: dict
         f"SELECT count(*), coalesce(sum({qi(headers[-1])}), 0), count(DISTINCT {qi(headers[0])}) FROM catalog"
     ).fetchone()
     if total != sum(actual_rows.values()) or files != len(plan.files):
-        raise AppError("validation_failed", "catalog.csv does not agree with the exported files. Nothing was published.")
+        raise AppError("validation_failed", "_catalog.csv does not agree with the exported files. Nothing was published.")
     con.execute(f"COPY catalog TO {ql(str(target))} (FORMAT csv, HEADER true)")
     return int(rows)
 

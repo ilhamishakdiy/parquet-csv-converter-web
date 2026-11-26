@@ -87,7 +87,8 @@ export function ConfigStep({
         />
         <p className="text-xs text-muted-foreground">
           Files are named <span className="font-mono">{"<prefix>_<filter value>_partXX.csv"}</span>. The filter value
-          and part number are added automatically.
+          and part number are added automatically. Start with a letter or digit, so that{" "}
+          <span className="font-mono">_catalog.csv</span> stays at the top of the folder.
         </p>
       </div>
 

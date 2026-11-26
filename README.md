@@ -21,6 +21,8 @@ tests/      acceptance tests (pytest)
 
 Paths can be typed, pasted or picked with **Browse**. Browsers never reveal real file paths, so the Browse buttons ask the local converter to open a Windows Explorer dialog on the PC (Tk, or the Windows Forms dialog through PowerShell if Tk is missing). The dialog can only pick a path. The path is still checked against the approved folders like a typed one.
 
+The first launch also creates a **Parquet to CSV Converter** desktop shortcut to `Start.bat`, with `converter.ico` as its icon. It does this once: a deleted shortcut is not recreated. If the folder moves, the shortcut is updated. Use `app.py --no-shortcut` to skip it.
+
 Running `Start.bat` again while the converter is running reopens the browser with the existing session instead of starting a second backend.
 
 ## Configuration (`config.json`, optional)
@@ -62,9 +64,9 @@ PS> cd frontend; bun install; bun run dev
 ## Output format
 
 * **CSV:** UTF-8 without BOM, comma separator, one header row, standard double-quote quoting. Multiline fields are quoted.
-* **NULL vs empty:** NULL is written as an empty, unquoted field (`a,,c`). An empty string is written as `""` (`a,"",c`). This applies to data parts and `catalog.csv`.
-* **Filenames:** `<prefix>_<filter value>_partXX.csv`. Numbering restarts at 01 for each filter value and widens beyond 99 parts. Without a filter: `<prefix>_partXX.csv`. Single CSV without a filter: `<prefix>.csv`. NULL and empty filter values become `__NULL__` and `__EMPTY__`. Windows-invalid characters become `_`. Values that collide case-insensitively or after sanitising get a stable `~<hash>` suffix. Raw values are always kept in `catalog.csv`.
-* **`catalog.csv`:** `file_name`, filter column, grouping columns, `row_count`. A source column named `file_name` or `row_count` is renamed `source_<name>`.
+* **NULL vs empty:** NULL is written as an empty, unquoted field (`a,,c`). An empty string is written as `""` (`a,"",c`). This applies to data parts and `_catalog.csv`.
+* **Filenames:** `<prefix>_<filter value>_partXX.csv`. Numbering restarts at 01 for each filter value and widens beyond 99 parts. Without a filter: `<prefix>_partXX.csv`. Single CSV without a filter: `<prefix>.csv`. NULL and empty filter values become `__NULL__` and `__EMPTY__`. Windows-invalid characters become `_`. Values that collide case-insensitively or after sanitising get a stable `~<hash>` suffix. Raw values are always kept in `_catalog.csv`. The prefix must start with a letter or digit, so `_catalog.csv` always sorts above the data files in Windows Explorer.
+* **`_catalog.csv`:** `file_name`, filter column, grouping columns, `row_count`. A source column named `file_name` or `row_count` is renamed `source_<name>`.
 * **Row order:** the original row order is not preserved.
 * **Excel:** values such as leading zeros or long IDs may be changed when a CSV is opened directly. Use Data > From Text/CSV to import them as text. Files with more than 1,048,575 rows trigger a warning.
 
@@ -73,7 +75,7 @@ PS> cd frontend; bun install; bun run dev
 1. `/inspect` reads Parquet metadata only (schema, row count) and fingerprints every file's path, size and modified time.
 2. `/preview` runs one aggregate scan of the filter and grouping columns. It applies sequential next-fit per filter value (deterministic order, NULLs last) and stores the plan in a DuckDB file.
 3. `/jobs` starts `python -m backend.worker` (one at a time). The worker joins the source to the plan with NULL-safe equality and writes every part in a single `COPY … PARTITION_BY` into a hidden staging folder inside the destination.
-4. The worker reads every part back to count its records and checks each against the plan and the total against the source. It re-checks the source fingerprint, writes `catalog.csv` and renames everything into place. It never overwrites, and it rolls back if a rename fails.
+4. The worker reads every part back to count its records and checks each against the plan and the total against the source. It re-checks the source fingerprint, writes `_catalog.csv` and renames everything into place. It never overwrites, and it rolls back if a rename fails.
 5. Cancellation, failure or a crashed worker removes staging, and nothing is published.
 
 ## Security
