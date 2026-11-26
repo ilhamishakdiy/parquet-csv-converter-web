@@ -16,7 +16,8 @@ const TOP = "ParquetConverter/";
 const README = `Parquet to CSV Converter
 ========================
 
-1. Install Python 3.10 or newer (tick "Add python.exe to PATH").
+1. Install Python 3.10 or newer from https://www.python.org/downloads/
+   (tick "Add python.exe to PATH" on the installer's first screen).
 2. Extract this ZIP (right-click > Extract All...) to a local folder you can write to.
    Recommended: C:\\Users\\<your name>\\ParquetConverter
    Avoid: Program Files (needs admin), network drives, OneDrive-synced folders,

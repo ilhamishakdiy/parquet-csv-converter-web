@@ -9,10 +9,26 @@ export const metadata: Metadata = {
 };
 
 const ZIP_PATH = "/downloads/ParquetConverter.zip";
+const PYTHON_URL = "https://www.python.org/downloads/";
+// Official Python Install Manager (per-user MSIX). Update when python.org publishes a new version.
+const PYTHON_MANAGER_URL = "https://www.python.org/ftp/python/pymanager/python-manager-26.4.msix";
 
-const REQUIREMENTS = [
+function PythonLink({ children = "python.org/downloads" }: { children?: ReactNode }) {
+  return (
+    <a className="underline" href={PYTHON_URL} target="_blank" rel="noreferrer">
+      {children} <ExternalLink className="inline size-3" />
+    </a>
+  );
+}
+
+const REQUIREMENTS: [string, ReactNode][] = [
   ["Windows 10 or 11", "Administrator rights are not needed."],
-  ["Python 3.10 or newer", "A one-time install. Tick “Add python.exe to PATH” during setup."],
+  [
+    "Python 3.10 or newer",
+    <>
+      A one-time install from the official site, <PythonLink />. Tick “Add python.exe to PATH” during setup.
+    </>,
+  ],
   ["16 GB RAM recommended", "For 5–8 GB Parquet files. Smaller files work with less."],
   ["Free disk space", "About 150 MB for the converter, plus room for the CSV output (usually 3–5× the Parquet size)."],
   ["Chrome or Edge", "Allow access to devices on your local network if asked."],
@@ -23,11 +39,7 @@ const TROUBLE: { q: string; a: ReactNode }[] = [
     q: "“Python 3.10 or newer was not found”",
     a: (
       <>
-        Install Python from your company software portal or{" "}
-        <a className="underline" href="https://www.python.org/downloads/windows/" target="_blank" rel="noreferrer">
-          python.org <ExternalLink className="inline size-3" />
-        </a>{" "}
-        and tick <strong>Add python.exe to PATH</strong>. Then double-click Start.bat again.
+        Install Python from your company software portal or the official site, <PythonLink />, and tick <strong>Add python.exe to PATH</strong>. Then double-click Start.bat again.
       </>
     ),
   },
@@ -73,10 +85,16 @@ export default function StartPage() {
                 <Download /> Download ParquetConverter.zip
               </a>
             </Button>
-            <span className="text-xs text-muted-foreground">
-              Contains Start.bat, the converter program and an offline copy of this website.
-            </span>
+            <Button asChild size="lg" variant="outline">
+              <a href={PYTHON_MANAGER_URL}>
+                <Download /> Download Python (python.org)
+              </a>
+            </Button>
           </div>
+          <p className="text-xs text-muted-foreground">
+            The ZIP contains Start.bat, the converter program and an offline copy of this website. Python (the official
+            Python Install Manager, about 96 MB) is needed once; skip it if Python 3.10+ is already installed.
+          </p>
         </div>
       </section>
 
@@ -97,8 +115,17 @@ export default function StartPage() {
           <h2 className="text-xl font-semibold tracking-tight">First launch</h2>
           <ol className="mt-4 space-y-4">
             <Step n={1} title="Install Python (once)">
-              Install Python 3.10 or newer from the company software portal or python.org. On the first screen of the
-              installer, tick <strong>Add python.exe to PATH</strong>.
+              <a className="underline" href={PYTHON_MANAGER_URL}>
+                Download the Python Install Manager
+              </a>{" "}
+              (official, from python.org, about 96 MB), double-click it and choose <strong>Install</strong>. No
+              administrator rights needed. The first time you run Start.bat it downloads Python itself; if it asks a
+              question in the black window, answer it there.
+              <span className="mt-2 block">
+                Prefer the classic installer, or the file above is blocked? Get Python 3.10 or newer from{" "}
+                <PythonLink /> or your company software portal, and tick <strong>Add python.exe to PATH</strong> on the
+                installer&apos;s first screen. Already have Python 3.10+? Skip this step.
+              </span>
             </Step>
             <Step n={2} title="Download and extract the converter">
               <a className="underline" href={ZIP_PATH} download>
