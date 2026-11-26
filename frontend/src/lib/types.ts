@@ -31,7 +31,7 @@ export type SourceInfo = {
 
 export type Mode = "single" | "rows" | "group";
 export type OversizePolicy = "strict" | "group_priority";
-export type CollisionPolicy = "fail" | "new_folder";
+export type CollisionPolicy = "fail" | "new_folder" | "overwrite";
 
 export type PlanWarning = {
   severity: "info" | "warning" | "blocking";

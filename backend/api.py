@@ -58,7 +58,7 @@ class JobBody(BaseModel):
     model_config = ConfigDict(extra="forbid")
     preview_id: str
     destination_dir: str
-    collision_policy: Literal["fail", "new_folder"] = "fail"
+    collision_policy: Literal["fail", "new_folder", "overwrite"] = "fail"
     acknowledge_oversize: bool = False
 
 
@@ -224,6 +224,7 @@ def create_app(cfg: Config, token: str) -> FastAPI:
             "plan_db": str(plan_db),
             "destination": str(destination),
             "create_destination": created,
+            "overwrite": body.collision_policy == "overwrite",
             "memory_limit": cfg.memory_limit,
             "threads": cfg.threads,
         }
@@ -317,12 +318,22 @@ def _prepare_destination(cfg: Config, plan: Plan, info: SourceInfo, body: JobBod
 
     names = [f.file_name for f in plan.files] + [naming.CATALOG_NAME]
     clashes = [n for n in names if (dest / n).exists()]
-    if clashes:
+    if clashes and body.collision_policy == "overwrite":
+        not_files = [n for n in clashes if not (dest / n).is_file()]
+        if not_files:
+            _undo(dest, created)
+            raise AppError(
+                "destination_collision",
+                f"These names are folders in the destination and cannot be overwritten: {', '.join(not_files[:5])}.",
+                409,
+            )
+        warnings.append(f"{len(clashes)} existing file(s) with the same names will be replaced.")
+    elif clashes:
         _undo(dest, created)
         shown = ", ".join(clashes[:5]) + (f" and {len(clashes) - 5} more" if len(clashes) > 5 else "")
         raise AppError(
             "destination_collision",
-            f"These files already exist in the destination: {shown}. Choose another folder or 'Create a new subfolder'. Files are never overwritten.",
+            f"These files already exist in the destination: {shown}. Choose another folder, 'Create a new dated subfolder' or 'Overwrite existing files'.",
             409,
         )
 
